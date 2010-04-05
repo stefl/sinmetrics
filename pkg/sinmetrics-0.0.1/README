@@ -1,0 +1,33 @@
+sinmetrics: simple sinatra metrics helpers
+  (c) 2010 Luke Petre (lpetre)
+
+=== Usage
+
+  require 'sinmetrics'
+  require 'sinatra'
+
+  mixpanel do
+    token  '4579...cbb0'
+  end
+
+  get '/' do
+    mp.log_event( 'play', @user.id)
+    "hello world"
+  end
+
+=== Features
+
+=== Other Options
+
+=== Standalone Usage
+
+  require 'sinmetrics'
+  mp = MixPanel.new(
+    :token  => '4579...cbb0',
+  )
+
+  >> mp.log_event( 'play', 1234 )
+  => 1
+
+=== Special Thanks
+  This library is *heavily* inspired by sinbook, http://github.com/tmm1/sinbook
