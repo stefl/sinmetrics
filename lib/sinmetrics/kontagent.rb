@@ -18,6 +18,7 @@ module Sinatra
           instance_variable_set("@#{var}", app.options.send("kontagent_#{var}"))
         end
       else
+        @request = Proc.new { |url| Net::HTTP.get( URI.parse(url) ) }
         [:api_key, :secret, :env, :request].each do |var|
           instance_variable_set("@#{var}", app[var]) if app.has_key?(var)
         end
