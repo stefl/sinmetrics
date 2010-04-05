@@ -41,6 +41,7 @@ module Sinatra
         nes nei
         pst psr
         apa apr
+        mes mer
         ucc
         pgr
         cpu
