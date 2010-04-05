@@ -15,7 +15,7 @@ module Sinatra
       if app.respond_to?(:options)
         @app = app
         [:api_key, :secret, :env].each do |var|
-          instance_variable_set("@#{var}", app.options.send("mixpanel_#{var}"))
+          instance_variable_set("@#{var}", app.options.send("kontagent_#{var}"))
         end
       else
         [:api_key, :secret, :env, :request].each do |var|

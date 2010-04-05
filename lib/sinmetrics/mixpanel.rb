@@ -66,6 +66,8 @@ module Sinatra
   class MixpanelSettings
     def initialize app, &blk
       @app = app
+      @app.set :mixpanel_api_key, nil
+      @app.set :mixpanel_secret, nil
       @app.set :mixpanel_request, Proc.new { |url| Net::HTTP.get(URI.parse(url)) }
       instance_eval &blk
     end
