@@ -1,7 +1,0 @@
-README
-Rakefile
-lib/sinmetrics.rb
-lib/sinmetrics/kontagent.rb
-lib/sinmetrics/mixpanel.rb
-sinmetrics.gemspec
-Manifest
