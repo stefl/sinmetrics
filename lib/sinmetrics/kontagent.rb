@@ -12,19 +12,26 @@ module Sinatra
   class KontagentObject
     @@version = 1
     def initialize app
-      @app = app
+      if app.respond_to?(:options)
+        @app = app
+        [:api_key, :secret, :env].each do |var|
+          instance_variable_set("@#{var}", app.options.send("mixpanel_#{var}"))
+        end
+      else
+        [:api_key, :secret, :env, :request].each do |var|
+          instance_variable_set("@#{var}", app[var]) if app.has_key?(var)
+        end
+      end
     end
 
     attr_reader :app
-    [ :api_key, :secret, :env, :request ].each do |var|
-      class_eval %[
-        def #{var}=(val)
-          @app.set :kontagent_#{var}, val
-        end
-        def #{var} *args
-          @app.options.kontagent_#{var} *args
-        end
-      ]
+    attr_accessor :api_key, :secret, :env
+    def request *args
+      if @app
+        @app.options.kontagent_request *args
+      else
+        @request.call *args
+      end
     end
 
     class APIProxy
@@ -115,3 +122,5 @@ module Sinatra
   
   Application.register Kontagent  
 end
+
+Kontagent = Sinatra::KontagentObject
