@@ -7,5 +7,6 @@ end
 
 $LOAD_PATH.unshift(File.dirname(__FILE__) + '/sinmetrics')
 
+require 'abingo'
 require 'kontagent'
 require 'mixpanel'
