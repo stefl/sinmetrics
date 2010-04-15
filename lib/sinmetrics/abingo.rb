@@ -5,32 +5,35 @@
 
 begin
   require 'sinatra/base'
+  require 'active_support'
 rescue LoadError
   retry if require 'rubygems'
   raise
 end
 
-module Sinatra
-  class AbingoObject
 
+module Sinatra  
+  class AbingoObject
+    
     #Defined options:
     #  :enable_specification => if true, allow params[test_name] to override the calculated value for a test.
     def initialize app={}
       if app.respond_to?(:options)
         @app = app
-        [:identity, :backend, :enable_specification, :cache_read, :cache_write].each do |var|
+        [:identity, :enable_specification, :cache, :salt].each do |var|
           instance_variable_set("@#{var}", app.options.send("abingo_#{var}"))
         end
       else
-        [:identity, :backend, :enable_specification, :cache_read, :cache_write].each do |var|
+        [:identity, :enable_specification, :cache, :salt].each do |var|
           instance_variable_set("@#{var}", app[var]) if app.has_key?(var)
         end
       end      
       @identity ||= rand(10 ** 10).to_i.to_s
-      @backend ||= :data_mapper
+      @cache ||= ActiveSupport::Cache::MemoryStore.new
+      @salt ||= ''
     end
 
-    attr_reader :app, :identity, :backend, :enable_specification, :cache_read, :cache_write
+    attr_reader :app, :identity, :enable_specification, :cache, :salt
 
     #A simple convenience method for doing an A/B test.  Returns true or false.
     #If you pass it a block, it will bind the choice to the variable given to the block.
@@ -47,26 +50,26 @@ module Sinatra
     #  :multiple_participation (true or false)
     #  :conversion  name of conversion to listen for  (alias: conversion_name)
     def test(test_name, alternatives, options = {})
-      short_circuit = cache_read("Abingo::Experiment::short_circuit(#{test_name})".gsub(" ", "_"))
+      short_circuit = cache.read("Abingo::Experiment::short_circuit(#{test_name})".gsub(" ", "_"))
       unless short_circuit.nil?
         return short_circuit  #Test has been stopped, pick canonical alternative.
       end
     
-      unless Abingo::Experiment.exists?(test_name)
+      unless Experiment.exists?(self, test_name)
         conversion_name = options[:conversion] || options[:conversion_name]
-        Abingo::Experiment.start_experiment!(test_name, self.parse_alternatives(alternatives), conversion_name)
+        Experiment.start_experiment!(self, test_name, parse_alternatives(alternatives), conversion_name)
       end
 
-      choice = self.find_alternative_for_user(test_name, alternatives)
-      participating_tests = cache_read("Abingo::participating_tests::#{Abingo.identity}") || []
+      choice = find_alternative_for_user(test_name, alternatives)
+      participating_tests = cache.read("Abingo::participating_tests::#{identity}") || []
     
       #Set this user to participate in this experiment, and increment participants count.
       if options[:multiple_participation] || !(participating_tests.include?(test_name))
         unless participating_tests.include?(test_name)
           participating_tests << test_name
-          cache_write("Abingo::participating_tests::#{Abingo.identity}", participating_tests)
+          cache.write("Abingo::participating_tests::#{identity}", participating_tests)
         end
-        Abingo::Alternative.score_participation(test_name)
+        Alternative.score_participation(self, test_name)
       end
 
       if block_given?
@@ -96,13 +99,13 @@ module Sinatra
       else
         if name.nil?
           #Score all participating tests
-          participating_tests = Abingo.cache.read("Abingo::participating_tests::#{Abingo.identity}") || []
+          participating_tests = cache.read("Abingo::participating_tests::#{Abingo.identity}") || []
           participating_tests.each do |participating_test|
             self.bingo!(participating_test, options)
           end
         else #Could be a test name or conversion name.
           conversion_name = name.gsub(" ", "_")
-          tests_listening_to_conversion = Abingo.cache.read("Abingo::tests_listening_to_conversion#{conversion_name}")
+          tests_listening_to_conversion = cache.read("Abingo::tests_listening_to_conversion#{conversion_name}")
           if tests_listening_to_conversion
             if tests_listening_to_conversion.size > 1
               tests_listening_to_conversion.map do |individual_test|
@@ -121,7 +124,7 @@ module Sinatra
       end
     end
 
-    protected
+    #protected
 
     #For programmer convenience, we allow you to specify what the alternatives for
     #an experiment are in a few ways.  Thus, we need to actually be able to handle
@@ -135,7 +138,7 @@ module Sinatra
     #              {:a => 2, :b => 3} produces :a 40% of the time, :b 60%.
     #
     #Alternatives are always represented internally as an array.
-    def self.parse_alternatives(alternatives)
+    def parse_alternatives(alternatives)
       if alternatives.kind_of? Array
         return alternatives
       elsif alternatives.kind_of? Integer
@@ -157,7 +160,7 @@ module Sinatra
       end
     end
 
-    def self.retrieve_alternatives(test_name, alternatives)
+    def retrieve_alternatives(test_name, alternatives)
       cache_key = "Abingo::Experiment::#{test_name}::alternatives".gsub(" ","_")
       alternative_array = self.cache.fetch(cache_key) do
         self.parse_alternatives(alternatives)
@@ -165,7 +168,7 @@ module Sinatra
       alternative_array
     end
 
-    def self.find_alternative_for_user(test_name, alternatives)
+    def find_alternative_for_user(test_name, alternatives)
       alternatives_array = retrieve_alternatives(test_name, alternatives)
       alternatives_array[self.modulo_choice(test_name, alternatives_array.size)]
     end
@@ -173,17 +176,17 @@ module Sinatra
     #Quickly determines what alternative to show a given user.  Given a test name
     #and their identity, we hash them together (which, for MD5, provably introduces
     #enough entropy that we don't care) otherwise
-    def self.modulo_choice(test_name, choices_count)
-      Digest::MD5.hexdigest(Abingo.salt.to_s + test_name + self.identity.to_s).to_i(16) % choices_count
+    def modulo_choice(test_name, choices_count)
+      Digest::MD5.hexdigest(salt.to_s + test_name + self.identity.to_s).to_i(16) % choices_count
     end
 
-    def self.score_conversion!(test_name)
+    def score_conversion!(test_name)
       test_name.gsub!(" ", "_")
-      participating_tests = Abingo.cache.read("Abingo::participating_tests::#{Abingo.identity}") || []
+      participating_tests = cache.read("Abingo::participating_tests::#{Abingo.identity}") || []
       if options[:assume_participation] || participating_tests.include?(test_name)
         cache_key = "Abingo::conversions(#{Abingo.identity},#{test_name}"
-        if options[:multiple_conversions] || !Abingo.cache.read(cache_key)
-          Abingo::Alternative.score_conversion(test_name)
+        if options[:multiple_conversions] || !cache.read(cache_key)
+          Abingo::Alternative.score_conversion(self, test_name)
           if Abingo.cache.exist?(cache_key)
             Abingo.cache.increment(cache_key)
           else
@@ -191,6 +194,16 @@ module Sinatra
           end
         end
       end
+    end
+  end
+  
+  module AbingoObject::ConversionRate
+    def conversion_rate
+      1.0 * conversions / participants
+    end
+
+    def pretty_conversion_rate
+      sprintf("%4.2f%%", conversion_rate * 100)
     end
   end
   
@@ -207,7 +220,7 @@ module Sinatra
       @app = app
       instance_eval &blk
     end
-    %w[identity backend enable_specification cache_read cache_write].each do |param|
+    %w[identity backend enable_specification cache salt].each do |param|
       class_eval %[
         def #{param} val, &blk
           @app.set :abingo_#{param}, val
@@ -230,3 +243,12 @@ module Sinatra
 end
 
 Abingo = Sinatra::AbingoObject
+
+require 'dm-core'
+require 'dm-aggregates'
+require 'dm-observer'
+require 'dm-timestamps'
+require 'dm-adjust'
+require 'abingo/statistics'
+require 'abingo/alternative'
+require 'abingo/experiment'

@@ -1,9 +1,12 @@
-class Abingo::Experiment < ActiveRecord::Base
+class Abingo::Experiment
+  include DataMapper::Resource
   include Abingo::Statistics
   include Abingo::ConversionRate
 
-  has_many :alternatives, :dependent => :destroy
-  validates_uniqueness_of :test_name
+  property :test_name, String, :key => true
+  property :status, String
+  
+  has n, :alternatives, "Alternative"
 
   def cache_keys
   ["Abingo::Experiment::exists(#{test_name})".gsub(" ", "_"),
@@ -33,60 +36,60 @@ class Abingo::Experiment < ActiveRecord::Base
     end
   end
 
-  def self.exists?(test_name)
+  def self.exists?(abingo, test_name)
     cache_key = "Abingo::Experiment::exists(#{test_name})".gsub(" ", "_")
-    ret = Abingo.cache.fetch(cache_key) do
+    ret = abingo.cache.fetch(cache_key) do
       count = Abingo::Experiment.count(:conditions => {:test_name => test_name})
       count > 0 ? count : nil
     end
     (!ret.nil?)
   end
 
-  def self.alternatives_for_test(test_name)
+  def self.alternatives_for_test(abingo, test_name)
     cache_key = "Abingo::#{test_name}::alternatives".gsub(" ","_")
-    Abingo.cache.fetch(cache_key) do
-      experiment = Abingo::Experiment.find_by_test_name(test_name)
-      alternatives_array = Abingo.cache.fetch(cache_key) do
+    abingo.cache.fetch(cache_key) do
+      experiment = Abingo::Experiment.first(:test_name => test_name)
+      alternatives_array = abingo.cache.fetch(cache_key) do
         tmp_array = experiment.alternatives.map do |alt|
           [alt.content, alt.weight]
         end
         tmp_hash = tmp_array.inject({}) {|hash, couplet| hash[couplet[0]] = couplet[1]; hash}
-        Abingo.parse_alternatives(tmp_hash)
+        abingo.parse_alternatives(tmp_hash)
       end
       alternatives_array
     end
   end
 
-  def self.start_experiment!(test_name, alternatives_array, conversion_name = nil)
+  def self.start_experiment!(abingo, test_name, alternatives_array, conversion_name = nil)
     conversion_name ||= test_name
     conversion_name.gsub!(" ", "_")
     cloned_alternatives_array = alternatives_array.clone
-    ActiveRecord::Base.transaction do
-      experiment = Abingo::Experiment.find_or_create_by_test_name(test_name)
-      experiment.alternatives.destroy_all  #Blows away alternatives for pre-existing experiments.
+    Abingo::Experiment.transaction do |txn|
+      experiment = Abingo::Experiment.first_or_create(:test_name => test_name)
+      experiment.alternatives.destroy  #Blows away alternatives for pre-existing experiments.
       while (cloned_alternatives_array.size > 0)
         alt = cloned_alternatives_array[0]
         weight = cloned_alternatives_array.size - (cloned_alternatives_array - [alt]).size
-        experiment.alternatives.build(:content => alt, :weight => weight,
-          :lookup => Abingo::Alternative.calculate_lookup(test_name, alt))
+        experiment.alternatives << Abingo::Alternative.new(:content => alt, :weight => weight,
+          :lookup => Abingo::Alternative.calculate_lookup(abingo, test_name, alt))
         cloned_alternatives_array -= [alt]
       end
       experiment.status = "Live"
-      experiment.save(false)  #Calling the validation here causes problems b/c of transaction.
-      Abingo.cache.write("Abingo::Experiment::exists(#{test_name})".gsub(" ", "_"), 1)
+      experiment.save
+      abingo.cache.write("Abingo::Experiment::exists(#{test_name})".gsub(" ", "_"), 1)
 
       #This might have issues in very, very high concurrency environments...
 
-      tests_listening_to_conversion = Abingo.cache.read("Abingo::tests_listening_to_conversion#{conversion_name}") || []
+      tests_listening_to_conversion = abingo.cache.read("Abingo::tests_listening_to_conversion#{conversion_name}") || []
       tests_listening_to_conversion << test_name unless tests_listening_to_conversion.include? test_name
-      Abingo.cache.write("Abingo::tests_listening_to_conversion#{conversion_name}", tests_listening_to_conversion)
+      abingo.cache.write("Abingo::tests_listening_to_conversion#{conversion_name}", tests_listening_to_conversion)
       experiment
     end
   end
 
   def end_experiment!(final_alternative, conversion_name = nil)
     conversion_name ||= test_name
-    ActiveRecord::Base.transaction do
+    Abingo::Experiment.transaction do
       alternatives.each do |alternative|
         alternative.lookup = "Experiment completed.  #{alternative.id}"
         alternative.save!
