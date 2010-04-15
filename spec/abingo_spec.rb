@@ -52,89 +52,92 @@ describe 'Abingo Specs' do
     Abingo::Experiment.exists?(@abingo, "other words right").should_not be_true
   end
   
-=begin
-  test "alternatives picked consistently" do
-    alternative_picked = Abingo.test("consistency_test", 1..100)
+  it "should pick alternatives consistently" do
+    alternative_picked = @abingo.test("consistency_test", 1..100)
     100.times do
-      assert_equal alternative_picked, Abingo.test("consistency_test", 1..100)
+      @abingo.test("consistency_test", 1..100).should == alternative_picked
     end
   end
 
-  test "participation works" do
+  it "should have working participation" do
     new_tests = %w{participationA participationB participationC}
     new_tests.map do |test_name|
-      Abingo.test(test_name, 1..5)
+      @abingo.test(test_name, 1..5)
     end
 
-    participating_tests = Abingo.cache.read("Abingo::participating_tests::#{Abingo.identity}") || []
+    participating_tests = @abingo.cache.read("Abingo::participating_tests::#{@abingo.identity}") || []
 
     new_tests.map do |test_name|
-      assert participating_tests.include? test_name
+      participating_tests.should include(test_name)
     end
   end
 
-  test "participants counted" do
+  it "should count participants" do
     test_name = "participants_counted_test"
-    alternative = Abingo.test(test_name, %w{a b c})
+    alternative = @abingo.test(test_name, %w{a b c})
 
-    ex = Abingo::Experiment.find_by_test_name(test_name)
-    lookup = Abingo::Alternative.calculate_lookup(test_name, alternative)
-    chosen_alt = Abingo::Alternative.find_by_lookup(lookup)
-    assert_equal 1, ex.participants
-    assert_equal 1, chosen_alt.participants
+    ex = Abingo::Experiment.first(:test_name => test_name)
+    lookup = Abingo::Alternative.calculate_lookup(@abingo, test_name, alternative)
+    chosen_alt = Abingo::Alternative.first(:lookup => lookup)
+    ex.participants.should == 1
+    chosen_alt.participants.should == 1
   end
 
-  test "conversion tracking by test name" do
+  it "should track conversions by test name" do
     test_name = "conversion_test_by_name"
-    alternative = Abingo.test(test_name, %w{a b c})
-    Abingo.bingo!(test_name)
-    ex = Abingo::Experiment.find_by_test_name(test_name)
-    lookup = Abingo::Alternative.calculate_lookup(test_name, alternative)
-    chosen_alt = Abingo::Alternative.find_by_lookup(lookup)
-    assert_equal 1, ex.conversions
-    assert_equal 1, chosen_alt.conversions
-    Abingo.bingo!(test_name)
+    alternative = @abingo.test(test_name, %w{a b c})
+    @abingo.bingo!(test_name)
+    ex = Abingo::Experiment.first(:test_name => test_name)
+    lookup = Abingo::Alternative.calculate_lookup(@abingo, test_name, alternative)
+    chosen_alt = Abingo::Alternative.first(:lookup => lookup)
+    ex.conversions.should == 1
+    chosen_alt.conversions.should == 1
+
+    @abingo.bingo!(test_name)
 
     #Should still only have one because this conversion should not be double counted.
     #We haven't specified that in the test options.
-    assert_equal 1, Abingo::Experiment.find_by_test_name(test_name).conversions
+    ex = Abingo::Experiment.first(:test_name => test_name)
+    ex.conversions.should == 1
   end
 
-  test "conversion tracking by conversion name" do
+  it "should track conversions by conversion name" do
     conversion_name = "purchase"
     tests = %w{conversionTrackingByConversionNameA conversionTrackingByConversionNameB conversionTrackingByConversionNameC}
     tests.map do |test_name|
-      Abingo.test(test_name, %w{A B}, :conversion => conversion_name)
+      @abingo.test(test_name, %w{A B}, :conversion => conversion_name)
     end
 
-    Abingo.bingo!(conversion_name)
+    @abingo.bingo!(conversion_name)
     tests.map do |test_name|
-      assert_equal 1, Abingo::Experiment.find_by_test_name(test_name).conversions
+      ex = Abingo::Experiment.first(:test_name => test_name)
+      ex.conversions.should == 1
     end
   end
 
-  test "short circuiting works" do
+  it "should be possible to short circuit tests" do
     conversion_name = "purchase"
     test_name = "short circuit test"
-    alt_picked = Abingo.test(test_name, %w{A B}, :conversion => conversion_name)
-    ex = Abingo::Experiment.find_by_test_name(test_name)
+    alt_picked = @abingo.test(test_name, %w{A B}, :conversion => conversion_name)
+    ex = Abingo::Experiment.first(:test_name => test_name)
     alt_not_picked = (%w{A B} - [alt_picked]).first
 
-    ex.end_experiment!(alt_not_picked, conversion_name)
+    ex.end_experiment!(@abingo, alt_not_picked, conversion_name)
 
     ex.reload
-    assert_equal "Finished", ex.status
+    ex.status.should == "Finished"
     
-    Abingo.bingo!(test_name)  #Should not be counted, test is over.
-    assert_equal 0, ex.conversions
+    @abingo.bingo!(test_name)  #Should not be counted, test is over.
+    ex.conversions.should == 0
 
-    old_identity = Abingo.identity
-    Abingo.identity = "shortCircuitTestNewIdentity"
-    Abingo.test(test_name, %w{A B}, :conversion => conversion_name)
-    Abingo.identity = old_identity
+    old_identity = @abingo.identity
+    @abingo.identity = "shortCircuitTestNewIdentity"
+    @abingo.test(test_name, %w{A B}, :conversion => conversion_name)
+    @abingo.identity = old_identity
     ex.reload
-    assert_equal 1, ex.participants  #Original identity counted, new identity not counted b/c test stopped
+
+    # Original identity counted, new identity not counted b/c test stopped
+    ex.participants.should == 1
   end
-=end
 end  
   

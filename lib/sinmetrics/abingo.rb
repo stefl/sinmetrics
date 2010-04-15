@@ -33,7 +33,8 @@ module Sinatra
       @salt ||= ''
     end
 
-    attr_reader :app, :identity, :enable_specification, :cache, :salt
+    attr_reader :app, :enable_specification, :cache, :salt
+    attr_accessor :identity
 
     #A simple convenience method for doing an A/B test.  Returns true or false.
     #If you pass it a block, it will bind the choice to the variable given to the block.
@@ -65,6 +66,7 @@ module Sinatra
     
       #Set this user to participate in this experiment, and increment participants count.
       if options[:multiple_participation] || !(participating_tests.include?(test_name))
+        participating_tests = participating_tests.dup if participating_tests.frozen?
         unless participating_tests.include?(test_name)
           participating_tests << test_name
           cache.write("Abingo::participating_tests::#{identity}", participating_tests)
@@ -99,7 +101,7 @@ module Sinatra
       else
         if name.nil?
           #Score all participating tests
-          participating_tests = cache.read("Abingo::participating_tests::#{Abingo.identity}") || []
+          participating_tests = cache.read("Abingo::participating_tests::#{identity}") || []
           participating_tests.each do |participating_test|
             self.bingo!(participating_test, options)
           end
@@ -109,16 +111,16 @@ module Sinatra
           if tests_listening_to_conversion
             if tests_listening_to_conversion.size > 1
               tests_listening_to_conversion.map do |individual_test|
-                self.score_conversion!(individual_test.to_s)
+                self.score_conversion!(individual_test.to_s, options)
               end
             elsif tests_listening_to_conversion.size == 1
               test_name_str = tests_listening_to_conversion.first.to_s
-              self.score_conversion!(test_name_str)
+              self.score_conversion!(test_name_str, options)
             end
           else
             #No tests listening for this conversion.  Assume it is just a test name.
             test_name_str = name.to_s
-            self.score_conversion!(test_name_str)
+            self.score_conversion!(test_name_str, options)
           end
         end
       end
@@ -180,17 +182,17 @@ module Sinatra
       Digest::MD5.hexdigest(salt.to_s + test_name + self.identity.to_s).to_i(16) % choices_count
     end
 
-    def score_conversion!(test_name)
+    def score_conversion!(test_name, options = {})
       test_name.gsub!(" ", "_")
-      participating_tests = cache.read("Abingo::participating_tests::#{Abingo.identity}") || []
+      participating_tests = cache.read("Abingo::participating_tests::#{identity}") || []
       if options[:assume_participation] || participating_tests.include?(test_name)
-        cache_key = "Abingo::conversions(#{Abingo.identity},#{test_name}"
+        cache_key = "Abingo::conversions(#{identity},#{test_name}"
         if options[:multiple_conversions] || !cache.read(cache_key)
-          Abingo::Alternative.score_conversion(self, test_name)
-          if Abingo.cache.exist?(cache_key)
-            Abingo.cache.increment(cache_key)
+          Alternative.score_conversion(self, test_name)
+          if cache.exist?(cache_key)
+            cache.increment(cache_key)
           else
-            Abingo.cache.write(cache_key, 1)
+            cache.write(cache_key, 1)
           end
         end
       end

@@ -23,11 +23,11 @@ class Abingo::Experiment
   end
 
   def participants
-    alternatives.sum("participants")
+    alternatives.sum(:participants)
   end
 
   def conversions
-    alternatives.sum("conversions")
+    alternatives.sum(:conversions)
   end
 
   def best_alternative
@@ -46,9 +46,9 @@ class Abingo::Experiment
   end
 
   def self.alternatives_for_test(abingo, test_name)
-    cache_key = "Abingo::#{test_name}::alternatives".gsub(" ","_")
+    cache_key = "Abingo::#{test_name}::alternatives".gsub(" ","_")    
     abingo.cache.fetch(cache_key) do
-      experiment = Abingo::Experiment.first(:test_name => test_name)
+      experiment = Abingo::Experiment.first(:test_name => test_name)      
       alternatives_array = abingo.cache.fetch(cache_key) do
         tmp_array = experiment.alternatives.map do |alt|
           [alt.content, alt.weight]
@@ -81,21 +81,22 @@ class Abingo::Experiment
       #This might have issues in very, very high concurrency environments...
 
       tests_listening_to_conversion = abingo.cache.read("Abingo::tests_listening_to_conversion#{conversion_name}") || []
+      tests_listening_to_conversion = tests_listening_to_conversion.dup if tests_listening_to_conversion.frozen?
       tests_listening_to_conversion << test_name unless tests_listening_to_conversion.include? test_name
       abingo.cache.write("Abingo::tests_listening_to_conversion#{conversion_name}", tests_listening_to_conversion)
       experiment
     end
   end
 
-  def end_experiment!(final_alternative, conversion_name = nil)
+  def end_experiment!(abingo, final_alternative, conversion_name = nil)
     conversion_name ||= test_name
     Abingo::Experiment.transaction do
       alternatives.each do |alternative|
         alternative.lookup = "Experiment completed.  #{alternative.id}"
         alternative.save!
       end
-      update_attribute(:status, "Finished")
-      Abingo.cache.write("Abingo::Experiment::short_circuit(#{test_name})".gsub(" ", "_"), final_alternative)
+      update(:status => "Finished")
+      abingo.cache.write("Abingo::Experiment::short_circuit(#{test_name})".gsub(" ", "_"), final_alternative)
     end
   end
 

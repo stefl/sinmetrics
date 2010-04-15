@@ -8,7 +8,7 @@ begin
   desc "Run all examples"
   Spec::Rake::SpecTask.new('spec') do |t|
     t.spec_files = FileList['spec/**/*_spec.rb']
-    t.spec_opts = ['-cfs']
+    t.spec_opts = ['-cubfs']
   end
 
   Spec::Rake::SpecTask.new('spec:rcov') do |t|
