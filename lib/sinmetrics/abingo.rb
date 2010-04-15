@@ -21,7 +21,10 @@ module Sinatra
       if app.respond_to?(:options)
         @app = app
         [:identity, :enable_specification, :cache, :salt].each do |var|
-          instance_variable_set("@#{var}", app.options.send("abingo_#{var}"))
+          begin
+            instance_variable_set("@#{var}", app.options.send("abingo_#{var}"))
+          rescue NoMethodError
+          end
         end
       else
         [:identity, :enable_specification, :cache, :salt].each do |var|
@@ -80,7 +83,6 @@ module Sinatra
         choice
       end
     end
-
 
     #Scores conversions for tests.
     #test_name_or_array supports three types of input:
@@ -212,6 +214,22 @@ module Sinatra
   module AbingoHelper
     def abingo
       env['abingo.helper'] ||= AbingoObject.new(self)
+    end
+    
+    def ab_test(test_name, alternatives = nil, options = {})
+      if (abingo.enable_specification && !params[test_name].blank?)
+        choice = params[test_name]
+      elsif (alternatives.nil?)
+        choice = abingo.flip(test_name)
+      else
+        choice = abingo.test(test_name, alternatives, options)
+      end
+
+      if block_given?
+        yield(choice)
+      else
+        choice
+      end
     end
     
     alias ab abingo
