@@ -1,3 +1,2 @@
 coverage
-pkg
-*.gemspec
+*.gem
