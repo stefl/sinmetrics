@@ -58,7 +58,7 @@ describe 'Abingo Specs' do
       @abingo.test("consistency_test", 1..100).should == alternative_picked
     end
   end
-
+  
   it "should have working participation" do
     new_tests = %w{participationA participationB participationC}
     new_tests.map do |test_name|
@@ -101,6 +101,14 @@ describe 'Abingo Specs' do
     ex.conversions.should == 1
   end
 
+  it "should know the best alternative" do
+    test_name = "conversion_test_by_name"
+    alternative = @abingo.test(test_name, %w{a b c})
+    @abingo.bingo!(test_name)
+    ex = Abingo::Experiment.first(:test_name => test_name)
+    ex.best_alternative
+  end
+  
   it "should track conversions by conversion name" do
     conversion_name = "purchase"
     tests = %w{conversionTrackingByConversionNameA conversionTrackingByConversionNameB conversionTrackingByConversionNameC}

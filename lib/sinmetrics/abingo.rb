@@ -203,6 +203,7 @@ module Sinatra
   
   module AbingoObject::ConversionRate
     def conversion_rate
+      return 0 if participants == 0
       1.0 * conversions / participants
     end
 

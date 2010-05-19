@@ -31,7 +31,8 @@ class Abingo::Experiment
   end
 
   def best_alternative
-    alternatives.max do |a,b|
+    alts = Array.new alternatives.each { |a| a }
+    alts.max do |a,b|
       a.conversion_rate <=> b.conversion_rate
     end
   end
