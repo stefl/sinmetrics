@@ -199,6 +199,14 @@ module Sinatra
         end
       end
     end
+    
+    def end_experiment(alternative_id)
+      alternative = Alternative.get(alternative_id)
+      experiment = alternative.experiment
+      if (experiment.status != "Completed")
+        experiment.end_experiment!(self, alternative.content)
+      end
+    end
   end
   
   module AbingoObject::ConversionRate

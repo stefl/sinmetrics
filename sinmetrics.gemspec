@@ -1,6 +1,6 @@
 spec = Gem::Specification.new do |s|
   s.name = 'sinmetrics'
-  s.version = '0.0.6'
+  s.version = '0.0.7'
   s.date = '2010-04-14'
   s.summary = 'simple sinatra metrics extension'
   s.description = 'A full-featured metrics extension for the sinatra webapp framework'
