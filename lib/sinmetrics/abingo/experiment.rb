@@ -46,21 +46,6 @@ class Abingo::Experiment
     (!ret.nil?)
   end
 
-  def self.alternatives_for_test(abingo, test_name)
-    cache_key = "Abingo::#{test_name}::alternatives".gsub(" ","_")    
-    abingo.cache.fetch(cache_key) do
-      experiment = Abingo::Experiment.first(:test_name => test_name)      
-      alternatives_array = abingo.cache.fetch(cache_key) do
-        tmp_array = experiment.alternatives.map do |alt|
-          [alt.content, alt.weight]
-        end
-        tmp_hash = tmp_array.inject({}) {|hash, couplet| hash[couplet[0]] = couplet[1]; hash}
-        abingo.parse_alternatives(tmp_hash)
-      end
-      alternatives_array
-    end
-  end
-
   def self.start_experiment!(abingo, test_name, alternatives_array, conversion_name = nil)
     conversion_name ||= test_name
     conversion_name.gsub!(" ", "_")
@@ -72,7 +57,7 @@ class Abingo::Experiment
         alt = cloned_alternatives_array[0]
         weight = cloned_alternatives_array.size - (cloned_alternatives_array - [alt]).size
         experiment.alternatives << Abingo::Alternative.new(:content => alt, :weight => weight,
-          :lookup => Abingo::Alternative.calculate_lookup(abingo, test_name, alt))
+          :lookup => abingo.calculate_alternative_lookup(test_name, alt))
         cloned_alternatives_array -= [alt]
       end
       experiment.status = "Live"

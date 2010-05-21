@@ -36,6 +36,13 @@ describe 'Abingo Specs' do
     @abingo.parse_alternatives(2..5).should_not include(1)
   end
   
+  it "should parse weighted alternatives" do
+    hash = { 'a' => 2, 'b' => 3, 'c' => 1}
+    array = %w{a a a b b c}
+    @abingo.parse_alternatives(array).should == array
+  end
+  
+  
   it "should create experiments" do
     Abingo::Experiment.count.should == 0
     Abingo::Alternative.count.should == 0
@@ -76,8 +83,8 @@ describe 'Abingo Specs' do
     test_name = "participants_counted_test"
     alternative = @abingo.test(test_name, %w{a b c})
 
-    ex = Abingo::Experiment.first(:test_name => test_name)
-    lookup = Abingo::Alternative.calculate_lookup(@abingo, test_name, alternative)
+    ex = Abingo::Experiment.get(test_name)
+    lookup = @abingo.calculate_alternative_lookup(test_name, alternative)
     chosen_alt = Abingo::Alternative.first(:lookup => lookup)
     ex.participants.should == 1
     chosen_alt.participants.should == 1
@@ -87,8 +94,8 @@ describe 'Abingo Specs' do
     test_name = "conversion_test_by_name"
     alternative = @abingo.test(test_name, %w{a b c})
     @abingo.bingo!(test_name)
-    ex = Abingo::Experiment.first(:test_name => test_name)
-    lookup = Abingo::Alternative.calculate_lookup(@abingo, test_name, alternative)
+    ex = Abingo::Experiment.get(test_name)
+    lookup =  @abingo.calculate_alternative_lookup(test_name, alternative)
     chosen_alt = Abingo::Alternative.first(:lookup => lookup)
     ex.conversions.should == 1
     chosen_alt.conversions.should == 1
@@ -97,16 +104,16 @@ describe 'Abingo Specs' do
 
     #Should still only have one because this conversion should not be double counted.
     #We haven't specified that in the test options.
-    ex = Abingo::Experiment.first(:test_name => test_name)
+    ex = Abingo::Experiment.get(test_name)
     ex.conversions.should == 1
   end
 
   it "should know the best alternative" do
     test_name = "conversion_test_by_name"
-    alternative = @abingo.test(test_name, %w{a b c})
+    alternative = @abingo.test(test_name, {'a' => 3, 'b' => 2, 'c' => 1})
     @abingo.bingo!(test_name)
-    ex = Abingo::Experiment.first(:test_name => test_name)
-    ex.best_alternative
+    ex = Abingo::Experiment.get(test_name)
+    ex.best_alternative.content.should == alternative
   end
   
   it "should track conversions by conversion name" do
@@ -118,7 +125,7 @@ describe 'Abingo Specs' do
 
     @abingo.bingo!(conversion_name)
     tests.map do |test_name|
-      ex = Abingo::Experiment.first(:test_name => test_name)
+      ex = Abingo::Experiment.get(test_name)
       ex.conversions.should == 1
     end
   end
@@ -127,7 +134,7 @@ describe 'Abingo Specs' do
     conversion_name = "purchase"
     test_name = "short circuit test"
     alt_picked = @abingo.test(test_name, %w{A B}, :conversion => conversion_name)
-    ex = Abingo::Experiment.first(:test_name => test_name)
+    ex = Abingo::Experiment.get(test_name)
     alt_not_picked = (%w{A B} - [alt_picked]).first
 
     ex.end_experiment!(@abingo, alt_not_picked, conversion_name)

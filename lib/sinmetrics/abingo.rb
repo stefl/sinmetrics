@@ -74,7 +74,9 @@ module Sinatra
           participating_tests << test_name
           cache.write("Abingo::participating_tests::#{identity}", participating_tests)
         end
-        Alternative.score_participation(self, test_name)
+        
+        lookup = calculate_alternative_lookup(test_name, choice)
+        Alternative.all(:lookup => lookup).adjust!(:participants => 1)
       end
 
       if block_given?
@@ -164,33 +166,40 @@ module Sinatra
       end
     end
 
-    def retrieve_alternatives(test_name, alternatives)
+    def find_alternative_for_user(test_name, alternatives)
       cache_key = "Abingo::Experiment::#{test_name}::alternatives".gsub(" ","_")
       alternative_array = self.cache.fetch(cache_key) do
         self.parse_alternatives(alternatives)
       end
-      alternative_array
-    end
 
-    def find_alternative_for_user(test_name, alternatives)
-      alternatives_array = retrieve_alternatives(test_name, alternatives)
-      alternatives_array[self.modulo_choice(test_name, alternatives_array.size)]
+      #Quickly determines what alternative to show a given user.  Given a test name
+      #and their identity, we hash them together (which, for MD5, provably introduces
+      #enough entropy that we don't care) otherwise
+      choice = Digest::MD5.hexdigest(salt.to_s + test_name + self.identity.to_s).to_i(16) % alternative_array.size
+      alternative_array[choice]
     end
-
-    #Quickly determines what alternative to show a given user.  Given a test name
-    #and their identity, we hash them together (which, for MD5, provably introduces
-    #enough entropy that we don't care) otherwise
-    def modulo_choice(test_name, choices_count)
-      Digest::MD5.hexdigest(salt.to_s + test_name + self.identity.to_s).to_i(16) % choices_count
+    
+    def alternatives_for_test(test_name)
+      cache_key = "Abingo::#{test_name}::alternatives".gsub(" ","_")    
+      self.cache.fetch(cache_key) do
+        Experiment.get(test_name).alternatives.map do |alt| 
+          if alt.weight > 1 
+            [alt.content] * alt.weight
+          else
+            alt.content
+          end
+        end.flatten
+      end
     end
 
     def score_conversion!(test_name, options = {})
-      test_name.gsub!(" ", "_")
       participating_tests = cache.read("Abingo::participating_tests::#{identity}") || []
       if options[:assume_participation] || participating_tests.include?(test_name)
         cache_key = "Abingo::conversions(#{identity},#{test_name}"
         if options[:multiple_conversions] || !cache.read(cache_key)
-          Alternative.score_conversion(self, test_name)
+          viewed_alternative = find_alternative_for_user(test_name, alternatives_for_test(test_name))
+          lookup = calculate_alternative_lookup(test_name, viewed_alternative)
+          Alternative.all(:lookup => lookup).adjust!(:conversions => 1)
           if cache.exist?(cache_key)
             cache.increment(cache_key)
           else
@@ -206,6 +215,10 @@ module Sinatra
       if (experiment.status != "Completed")
         experiment.end_experiment!(self, alternative.content)
       end
+    end
+    
+    def calculate_alternative_lookup(test_name, alternative_name)
+      Digest::MD5.hexdigest(self.salt + test_name + alternative_name.to_s)
     end
   end
   

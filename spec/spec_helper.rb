@@ -5,6 +5,7 @@ require 'spec'
 require 'sinmetrics'
 
 # establish in-memory database for testing
+#DataMapper::Logger.new($stdout, :debug)
 DataMapper.setup(:default, "sqlite3::memory:")
 
 Spec::Runner.configure do |config|
