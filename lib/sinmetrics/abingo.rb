@@ -42,42 +42,29 @@ module Sinatra
     #A simple convenience method for doing an A/B test.  Returns true or false.
     #If you pass it a block, it will bind the choice to the variable given to the block.
     def flip(test_name)
+      choice = test(test_name, [true, false])
       if block_given?
-        yield(test(test_name, [true, false]))
+        yield choice
       else
-        test(test_name, [true, false])
+        choice
       end
     end
 
     #This is the meat of A/Bingo.
     #options accepts
     #  :multiple_participation (true or false)
-    #  :conversion  name of conversion to listen for  (alias: conversion_name)
+    #  :no_particiation (true or false)
     def test(test_name, alternatives, options = {})
-      short_circuit = cache.read("Abingo::Experiment::short_circuit(#{test_name})".gsub(" ", "_"))
-      unless short_circuit.nil?
-        return short_circuit  #Test has been stopped, pick canonical alternative.
-      end
-    
-      unless Experiment.exists?(self, test_name)
-        conversion_name = options[:conversion] || options[:conversion_name]
-        Experiment.start_experiment!(self, test_name, parse_alternatives(alternatives), conversion_name)
-      end
+      experiment = Experiment.get(test_name)
+      experiment ||= Experiment.start_experiment!(self, test_name, parse_alternatives(alternatives))
 
-      choice = find_alternative_for_user(test_name, alternatives)
-      participating_tests = cache.read("Abingo::participating_tests::#{identity}") || []
-    
-      #Set this user to participate in this experiment, and increment participants count.
-      if options[:multiple_participation] || !(participating_tests.include?(test_name))
-        participating_tests = participating_tests.dup if participating_tests.frozen?
-        unless participating_tests.include?(test_name)
-          participating_tests << test_name
-          cache.write("Abingo::participating_tests::#{identity}", participating_tests)
-        end
-        
-        lookup = calculate_alternative_lookup(test_name, choice)
-        Alternative.all(:lookup => lookup).adjust!(:participants => 1)
+      # Test has been stopped, pick canonical alternative.
+      unless experiment.short_circuit.nil?
+        return experiment.short_circuit
       end
+    
+      choice = find_alternative_for_user(test_name, alternatives)
+      score_participation!(test_name, options) unless options[:no_participation]
 
       if block_given?
         yield(choice)
@@ -88,9 +75,6 @@ module Sinatra
 
     #Scores conversions for tests.
     #test_name_or_array supports three types of input:
-    #
-    #A conversion name: scores a conversion for any test the user is participating in which
-    #  is listening to the specified conversion.
     #
     #A test name: scores a conversion for the named test if the user is participating in it.
     #
@@ -109,23 +93,8 @@ module Sinatra
           participating_tests.each do |participating_test|
             self.bingo!(participating_test, options)
           end
-        else #Could be a test name or conversion name.
-          conversion_name = name.gsub(" ", "_")
-          tests_listening_to_conversion = cache.read("Abingo::tests_listening_to_conversion#{conversion_name}")
-          if tests_listening_to_conversion
-            if tests_listening_to_conversion.size > 1
-              tests_listening_to_conversion.map do |individual_test|
-                self.score_conversion!(individual_test.to_s, options)
-              end
-            elsif tests_listening_to_conversion.size == 1
-              test_name_str = tests_listening_to_conversion.first.to_s
-              self.score_conversion!(test_name_str, options)
-            end
-          else
-            #No tests listening for this conversion.  Assume it is just a test name.
-            test_name_str = name.to_s
-            self.score_conversion!(test_name_str, options)
-          end
+        else
+          self.score_conversion!(name.to_s, options)
         end
       end
     end
@@ -180,7 +149,7 @@ module Sinatra
     end
     
     def alternatives_for_test(test_name)
-      cache_key = "Abingo::#{test_name}::alternatives".gsub(" ","_")    
+      cache_key = "Abingo::Experiment::#{test_name}::alternatives".gsub(" ","_")    
       self.cache.fetch(cache_key) do
         Experiment.get(test_name).alternatives.map do |alt| 
           if alt.weight > 1 
@@ -206,6 +175,23 @@ module Sinatra
             cache.write(cache_key, 1)
           end
         end
+      end
+    end
+    
+    def score_participation!(test_name, options = {})
+      participating_tests = cache.read("Abingo::participating_tests::#{identity}") || []
+    
+      #Set this user to participate in this experiment, and increment participants count.
+      if options[:multiple_participation] || !(participating_tests.include?(test_name))
+        participating_tests = participating_tests.dup if participating_tests.frozen?
+        unless participating_tests.include?(test_name)
+          participating_tests << test_name
+          cache.write("Abingo::participating_tests::#{identity}", participating_tests)
+        end
+        
+        choice = find_alternative_for_user(test_name, alternatives_for_test(test_name))
+        lookup = calculate_alternative_lookup(test_name, choice)
+        Alternative.all(:lookup => lookup).adjust!(:participants => 1)
       end
     end
     

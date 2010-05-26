@@ -5,6 +5,7 @@ class Abingo::Experiment
 
   property :test_name, String, :key => true
   property :status, String
+  property :short_circuit, String
   
   has n, :alternatives, "Alternative"
 
@@ -37,18 +38,7 @@ class Abingo::Experiment
     end
   end
 
-  def self.exists?(abingo, test_name)
-    cache_key = "Abingo::Experiment::exists(#{test_name})".gsub(" ", "_")
-    ret = abingo.cache.fetch(cache_key) do
-      count = Abingo::Experiment.count(:conditions => {:test_name => test_name})
-      count > 0 ? count : nil
-    end
-    (!ret.nil?)
-  end
-
-  def self.start_experiment!(abingo, test_name, alternatives_array, conversion_name = nil)
-    conversion_name ||= test_name
-    conversion_name.gsub!(" ", "_")
+  def self.start_experiment!(abingo, test_name, alternatives_array)
     cloned_alternatives_array = alternatives_array.clone
     Abingo::Experiment.transaction do |txn|
       experiment = Abingo::Experiment.first_or_create(:test_name => test_name)
@@ -62,27 +52,17 @@ class Abingo::Experiment
       end
       experiment.status = "Live"
       experiment.save
-      abingo.cache.write("Abingo::Experiment::exists(#{test_name})".gsub(" ", "_"), 1)
-
-      #This might have issues in very, very high concurrency environments...
-
-      tests_listening_to_conversion = abingo.cache.read("Abingo::tests_listening_to_conversion#{conversion_name}") || []
-      tests_listening_to_conversion = tests_listening_to_conversion.dup if tests_listening_to_conversion.frozen?
-      tests_listening_to_conversion << test_name unless tests_listening_to_conversion.include? test_name
-      abingo.cache.write("Abingo::tests_listening_to_conversion#{conversion_name}", tests_listening_to_conversion)
       experiment
     end
   end
 
-  def end_experiment!(abingo, final_alternative, conversion_name = nil)
-    conversion_name ||= test_name
+  def end_experiment!(abingo, final_alternative)
     Abingo::Experiment.transaction do
       alternatives.each do |alternative|
         alternative.lookup = "Experiment completed.  #{alternative.id}"
         alternative.save!
       end
-      update(:status => "Finished")
-      abingo.cache.write("Abingo::Experiment::short_circuit(#{test_name})".gsub(" ", "_"), final_alternative)
+      update(:status => "Finished", :short_circuit => final_alternative)
     end
   end
 

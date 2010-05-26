@@ -53,12 +53,6 @@ describe 'Abingo Specs' do
     alternatives.should include(alternative_selected)
   end
   
-  it "should be able to call exists" do
-    @abingo.test("exist words right", %w{does does_not})
-    Abingo::Experiment.exists?(@abingo, "exist words right").should be_true
-    Abingo::Experiment.exists?(@abingo, "other words right").should_not be_true
-  end
-  
   it "should pick alternatives consistently" do
     alternative_picked = @abingo.test("consistency_test", 1..100)
     100.times do
@@ -116,28 +110,13 @@ describe 'Abingo Specs' do
     ex.best_alternative.content.should == alternative
   end
   
-  it "should track conversions by conversion name" do
-    conversion_name = "purchase"
-    tests = %w{conversionTrackingByConversionNameA conversionTrackingByConversionNameB conversionTrackingByConversionNameC}
-    tests.map do |test_name|
-      @abingo.test(test_name, %w{A B}, :conversion => conversion_name)
-    end
-
-    @abingo.bingo!(conversion_name)
-    tests.map do |test_name|
-      ex = Abingo::Experiment.get(test_name)
-      ex.conversions.should == 1
-    end
-  end
-
   it "should be possible to short circuit tests" do
-    conversion_name = "purchase"
     test_name = "short circuit test"
-    alt_picked = @abingo.test(test_name, %w{A B}, :conversion => conversion_name)
+    alt_picked = @abingo.test(test_name, %w{A B})
     ex = Abingo::Experiment.get(test_name)
     alt_not_picked = (%w{A B} - [alt_picked]).first
 
-    ex.end_experiment!(@abingo, alt_not_picked, conversion_name)
+    ex.end_experiment!(@abingo, alt_not_picked)
 
     ex.reload
     ex.status.should == "Finished"
@@ -147,7 +126,7 @@ describe 'Abingo Specs' do
 
     old_identity = @abingo.identity
     @abingo.identity = "shortCircuitTestNewIdentity"
-    @abingo.test(test_name, %w{A B}, :conversion => conversion_name)
+    @abingo.test(test_name, %w{A B})
     @abingo.identity = old_identity
     ex.reload
 
