@@ -3,6 +3,7 @@ $:.unshift(File.dirname(__FILE__) + '/../lib')
 require 'rubygems'
 require 'spec'
 require 'sinmetrics'
+require 'dm-migrations'
 
 # establish in-memory database for testing
 #DataMapper::Logger.new($stdout, :debug)

@@ -1,6 +1,6 @@
 spec = Gem::Specification.new do |s|
   s.name = 'sinmetrics'
-  s.version = '0.0.8'
+  s.version = '0.0.9'
   s.date = '2010-04-14'
   s.summary = 'simple sinatra metrics extension'
   s.description = 'A full-featured metrics extension for the sinatra webapp framework'
@@ -10,12 +10,12 @@ spec = Gem::Specification.new do |s|
   s.authors = ["Luke Petre"]
   s.email = "lpetre@gmail.com"
 
-  s.add_dependency('dm-core',        '>= 0.10.2')
-  s.add_dependency('dm-aggregates',  '>= 0.10.2')
-  s.add_dependency('dm-observer',    '>= 0.10.2')
-  s.add_dependency('dm-timestamps',  '>= 0.10.2')
-  s.add_dependency('dm-adjust',      '>= 0.10.2')
-  s.add_dependency('activesupport',  '~> 2.3.5')
+  s.add_dependency('dm-core',         '>= 1.0.0')
+  s.add_dependency('dm-transactions', '>= 1.0.0')
+  s.add_dependency('dm-aggregates',   '>= 1.0.0')
+  s.add_dependency('dm-validations',  '>= 1.0.0')
+  s.add_dependency('dm-adjust',       '>= 1.0.0')
+  s.add_dependency('activesupport',   '~> 2.3.5')
   s.has_rdoc = false
 
   # ruby -rpp -e' pp `git ls-files | grep -v examples`.split("\n") '

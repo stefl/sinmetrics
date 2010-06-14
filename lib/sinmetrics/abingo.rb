@@ -273,9 +273,9 @@ end
 Abingo = Sinatra::AbingoObject
 
 require 'dm-core'
+require 'dm-transactions'
 require 'dm-aggregates'
-require 'dm-observer'
-require 'dm-timestamps'
+require 'dm-validations'
 require 'dm-adjust'
 require 'abingo/statistics'
 require 'abingo/alternative'
