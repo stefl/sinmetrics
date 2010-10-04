@@ -10,6 +10,12 @@ begin
     gemspec.email = "lpetre@gmail.com"
     gemspec.homepage = "http://github.com/stefl/sinmetrics"
     gemspec.authors = ["Luke Petre"]
+    gemspec.add_dependency('activesupport', '>= 3.0.0')
+    gemspec.add_dependency('dm-core',         '>= 1.0.0')
+    gemspec.add_dependency('dm-transactions', '>= 1.0.0')
+    gemspec.add_dependency('dm-aggregates',   '>= 1.0.0')
+    gemspec.add_dependency('dm-validations',  '>= 1.0.0')
+    gemspec.add_dependency('dm-adjust',       '>= 1.0.0')
   end
 rescue LoadError
   puts "Jeweler not available. Install it with: gem install jeweler"
