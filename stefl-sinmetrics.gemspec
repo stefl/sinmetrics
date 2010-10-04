@@ -30,7 +30,8 @@ Gem::Specification.new do |s|
      "spec/abingo_spec.rb",
      "spec/kontagent_spec.rb",
      "spec/mixpanel_spec.rb",
-     "spec/spec_helper.rb"
+     "spec/spec_helper.rb",
+     "stefl-sinmetrics.gemspec"
   ]
   s.homepage = %q{http://github.com/stefl/sinmetrics}
   s.rdoc_options = ["--charset=UTF-8"]
@@ -49,9 +50,27 @@ Gem::Specification.new do |s|
     s.specification_version = 3
 
     if Gem::Version.new(Gem::VERSION) >= Gem::Version.new('1.2.0') then
+      s.add_runtime_dependency(%q<activesupport>, [">= 3.0.0"])
+      s.add_runtime_dependency(%q<dm-core>, [">= 1.0.0"])
+      s.add_runtime_dependency(%q<dm-transactions>, [">= 1.0.0"])
+      s.add_runtime_dependency(%q<dm-aggregates>, [">= 1.0.0"])
+      s.add_runtime_dependency(%q<dm-validations>, [">= 1.0.0"])
+      s.add_runtime_dependency(%q<dm-adjust>, [">= 1.0.0"])
     else
+      s.add_dependency(%q<activesupport>, [">= 3.0.0"])
+      s.add_dependency(%q<dm-core>, [">= 1.0.0"])
+      s.add_dependency(%q<dm-transactions>, [">= 1.0.0"])
+      s.add_dependency(%q<dm-aggregates>, [">= 1.0.0"])
+      s.add_dependency(%q<dm-validations>, [">= 1.0.0"])
+      s.add_dependency(%q<dm-adjust>, [">= 1.0.0"])
     end
   else
+    s.add_dependency(%q<activesupport>, [">= 3.0.0"])
+    s.add_dependency(%q<dm-core>, [">= 1.0.0"])
+    s.add_dependency(%q<dm-transactions>, [">= 1.0.0"])
+    s.add_dependency(%q<dm-aggregates>, [">= 1.0.0"])
+    s.add_dependency(%q<dm-validations>, [">= 1.0.0"])
+    s.add_dependency(%q<dm-adjust>, [">= 1.0.0"])
   end
 end
 
