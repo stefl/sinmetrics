@@ -1,6 +1,20 @@
 require 'rubygems'
 require 'rake'
 
+begin
+  require 'jeweler'
+  Jeweler::Tasks.new do |gemspec|
+    gemspec.name = "stefl-sinmetrics"
+    gemspec.summary = "simple sinatra metrics extension"
+    gemspec.description = "A full-featured metrics extension for the sinatra webapp framework"
+    gemspec.email = "lpetre@gmail.com"
+    gemspec.homepage = "http://github.com/stefl/sinmetrics"
+    gemspec.authors = ["Luke Petre"]
+  end
+rescue LoadError
+  puts "Jeweler not available. Install it with: gem install jeweler"
+end
+
 task :default => :spec
 
 begin
